@@ -33,6 +33,8 @@ import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 
+import ai.rapids.cudf._
+
 class CastOpSuite extends GpuExpressionTestSuite {
   import CastOpSuite._
 
@@ -64,42 +66,42 @@ class CastOpSuite extends GpuExpressionTestSuite {
 
   test("Cast from string to boolean using random inputs") {
     testCastStringTo(DataTypes.BooleanType,
-      generateRandomStrings(Some(BOOL_CHARS), maxStringLen = 1))
+      generateRandomStrings(Some(BOOL_CHARS), maxStringLen = 1), ansiMode = AnsiDisabled, "string_to_bool_random1")
     testCastStringTo(DataTypes.BooleanType,
-      generateRandomStrings(Some(BOOL_CHARS), maxStringLen = 3))
-    testCastStringTo(DataTypes.BooleanType, generateRandomStrings(Some(BOOL_CHARS)))
+      generateRandomStrings(Some(BOOL_CHARS), maxStringLen = 3), ansiMode = AnsiDisabled, "string_to_bool_random2")
+    testCastStringTo(DataTypes.BooleanType, generateRandomStrings(Some(BOOL_CHARS)), ansiMode = AnsiDisabled, "string_to_bool_random3")
   }
 
   test("Cast from string to boolean using hand-picked values") {
     testCastStringTo(DataTypes.BooleanType, Seq("\n\nN", "False", "FALSE", "false", "FaLsE",
-      "f", "F", "True", "TRUE", "true", "tRuE", "t", "T", "Y", "y", "10", "01", "0", "1"))
+      "f", "F", "True", "TRUE", "true", "tRuE", "t", "T", "Y", "y", "10", "01", "0", "1"), ansiMode = AnsiDisabled, "string_to_bool_handpicked")
   }
 
   test("Cast from string to byte using random inputs") {
-    testCastStringTo(DataTypes.ByteType, generateRandomStrings(Some(NUMERIC_CHARS)))
+    testCastStringTo(DataTypes.ByteType, generateRandomStrings(Some(NUMERIC_CHARS)), ansiMode = AnsiDisabled, "string_to_byte_random")
   }
 
   test("Cast from string to short using random inputs") {
-    testCastStringTo(DataTypes.ShortType, generateRandomStrings(Some(NUMERIC_CHARS)))
+    testCastStringTo(DataTypes.ShortType, generateRandomStrings(Some(NUMERIC_CHARS)), ansiMode = AnsiDisabled, "string_to_short_random1")
   }
 
   test("Cast from string to int using random inputs") {
-    testCastStringTo(DataTypes.IntegerType, generateRandomStrings(Some(NUMERIC_CHARS)))
+    testCastStringTo(DataTypes.IntegerType, generateRandomStrings(Some(NUMERIC_CHARS)), ansiMode = AnsiDisabled, "string_to_int_random1")
   }
 
   test("Cast from string to int using hand-picked values") {
     testCastStringTo(DataTypes.IntegerType, Seq(".--e-37602.n", "\r\r\t\n11.12380", "-.2", ".3",
-      ".", "+1.2", "\n123\n456\n", "1e+4"))
+      ".", "+1.2", "\n123\n456\n", "1e+4"), ansiMode = AnsiDisabled, "string_to_int_handpicked")
   }
 
   test("Cast from string to int ANSI mode with mix of valid and invalid values") {
     testCastStringTo(DataTypes.IntegerType, Seq(".--e-37602.n", "\r\r\t\n11.12380", "-.2", ".3",
-      ".", "+1.2", "\n123\n456\n", "1 2", null, "123"), ansiMode = AnsiExpectFailure)
+      ".", "+1.2", "\n123\n456\n", "1 2", null, "123"), ansiMode = AnsiExpectFailure, "string_to_int_mixed_ansi_xfail")
   }
 
   test("Cast from string to int ANSI mode with valid values") {
     testCastStringTo(DataTypes.IntegerType, Seq("1", "-1"),
-      ansiMode = AnsiExpectSuccess)
+      ansiMode = AnsiExpectSuccess, "string_to_int_ansi")
   }
 
   test("Cast from string to int ANSI mode with invalid values") {
@@ -111,28 +113,28 @@ class CastOpSuite extends GpuExpressionTestSuite {
   }
 
   test("Cast from string to int ANSI mode with nulls") {
-    testCastStringTo(DataTypes.IntegerType, Seq(null, null, null), ansiMode = AnsiExpectSuccess)
+    testCastStringTo(DataTypes.IntegerType, Seq(null, null, null), ansiMode = AnsiExpectSuccess, "string_to_int_ansi_nulls", true)
   }
 
   test("Cast from string to int ANSI mode with newline in string") {
-    testCastStringTo(DataTypes.IntegerType, Seq("1\n2"), ansiMode = AnsiExpectFailure)
+    testCastStringTo(DataTypes.IntegerType, Seq("1\n2"), ansiMode = AnsiExpectFailure, "string_to_int_ansi_newline_xfail")
   }
 
   test("Cast from string to long using random inputs") {
-    testCastStringTo(DataTypes.LongType, generateRandomStrings(Some(NUMERIC_CHARS)))
+    testCastStringTo(DataTypes.LongType, generateRandomStrings(Some(NUMERIC_CHARS)), ansiMode = AnsiDisabled, "string_to_long_random1")
   }
 
   test("Cast from string to float using random inputs") {
-    testCastStringTo(DataTypes.FloatType, generateRandomStrings(Some(NUMERIC_CHARS)))
+    testCastStringTo(DataTypes.FloatType, generateRandomStrings(Some(NUMERIC_CHARS)), ansiMode = AnsiDisabled, "string_to_float_random")
   }
 
   test("Cast from string to float using hand-picked values") {
     testCastStringTo(DataTypes.FloatType, Seq(".", "e", "Infinity", "+Infinity", "-Infinity",
-      "+nAn", "-naN", "Nan", "5f", "1.2f", "\riNf", null))
+      "+nAn", "-naN", "Nan", "5f", "1.2f", "\riNf", null), ansiMode = AnsiDisabled, "string_to_float_handpicked", true)
   }
 
   test("Cast from string to float ANSI mode with nulls") {
-    testCastStringTo(DataTypes.FloatType, Seq(null, null, null), ansiMode = AnsiExpectSuccess)
+    testCastStringTo(DataTypes.FloatType, Seq(null, null, null), ansiMode = AnsiExpectSuccess, "string_to_float_ansi_nulls", true)
   }
 
   test("Cast from string to float ANSI mode with invalid values") {
@@ -144,39 +146,39 @@ class CastOpSuite extends GpuExpressionTestSuite {
   }
 
   test("Cast from string to double using random inputs") {
-    testCastStringTo(DataTypes.DoubleType, generateRandomStrings(Some(NUMERIC_CHARS)))
+    testCastStringTo(DataTypes.DoubleType, generateRandomStrings(Some(NUMERIC_CHARS)), ansiMode = AnsiDisabled, "string_to_double_random1")
   }
 
   test("Cast from string to date using random inputs") {
     // We cannot do the full range of parsing unless it is prior to 3.2.0
     assumePriorToSpark320
-    testCastStringTo(DataTypes.DateType, generateRandomStrings(Some(DATE_CHARS), maxStringLen = 8))
+    testCastStringTo(DataTypes.DateType, generateRandomStrings(Some(DATE_CHARS), maxStringLen = 8), ansiMode = AnsiDisabled, "string_to_date_random1")
   }
 
   test("Cast from string to date using random inputs with valid year prefix") {
     // We cannot do the full range of parsing unless it is prior to 3.2.0
     assumePriorToSpark320
     testCastStringTo(DataTypes.DateType,
-      generateRandomStrings(Some(DATE_CHARS), maxStringLen = 8, Some("2021")))
+      generateRandomStrings(Some(DATE_CHARS), maxStringLen = 8, Some("2021")), ansiMode = AnsiDisabled, "string_to_date_random_with_valid_year")
   }
 
   test("Cast from string to timestamp") {
     testCastStringTo(DataTypes.TimestampType,
-      timestampsAsStringsSeq(castStringToTimestamp = true, validOnly = false))
+      timestampsAsStringsSeq(castStringToTimestamp = true, validOnly = false), ansiMode = AnsiDisabled, "string_to_timestamp")
   }
 
   ignore("Cast from string to timestamp using random inputs") {
     // Test ignored due to known issues
     // https://github.com/NVIDIA/spark-rapids/issues/2889
     testCastStringTo(DataTypes.TimestampType,
-      generateRandomStrings(Some(DATE_CHARS), maxStringLen = 32, None))
+      generateRandomStrings(Some(DATE_CHARS), maxStringLen = 32, None), ansiMode = AnsiDisabled, "string_to_timestamp_random1")
   }
 
   ignore("Cast from string to timestamp using random inputs with valid year prefix") {
     // Test ignored due to known issues
     // https://github.com/NVIDIA/spark-rapids/issues/2889
     testCastStringTo(DataTypes.TimestampType,
-      generateRandomStrings(Some(DATE_CHARS), maxStringLen = 32, Some("2021-")))
+      generateRandomStrings(Some(DATE_CHARS), maxStringLen = 32, Some("2021-")), ansiMode = AnsiDisabled, "string_to_timestamp_random_with_valid_year")
   }
 
   private def generateRandomStrings(
@@ -196,26 +198,35 @@ class CastOpSuite extends GpuExpressionTestSuite {
   private def testCastStringTo(
       toType: DataType,
       strings: Seq[String],
-      ansiMode: AnsiTestMode = AnsiDisabled): Unit = {
-
-    def castDf(spark: SparkSession): Seq[Row] = {
-      import spark.implicits._
-      val df = strings.zipWithIndex.toDF("c0", "id").repartition(2)
-      val castDf = df.withColumn("c1", col("c0").cast(toType))
-      castDf.collect()
-    }
+      ansiMode: AnsiTestMode = AnsiDisabled,
+      outname: String = "",
+      nullable : Boolean = false): Unit = {
 
     val INDEX_ID = 1
     val INDEX_C0 = 0
     val INDEX_C1 = 2
+
+    // def castDf(spark: SparkSession): DataFrame = {
+    def castDf(spark: SparkSession): (Seq[Row], DataFrame) = {
+      import spark.implicits._
+      val df = strings.zipWithIndex.toDF("c0", "id").repartition(2)      
+      // return df.withColumn("c1", col("c0").cast(toType))
+      //val Seq[Row] col = castDf.collect()    
+      //return(col.sortBy(castDf.getInt(INDEX_ID)), castDf)
+      // return(col.sortBy(_.getInt(INDEX_ID)), castDf)
+      val castDf = df.withColumn("c1", col("c0").cast(toType))
+      return (castDf.collect().sortBy(_.getInt(INDEX_ID)), castDf)
+    }    
 
     val ansiModeBoolString = (ansiMode != AnsiDisabled).toString
 
     val cpuConf = new SparkConf()
       .set(SQLConf.ANSI_ENABLED.key, ansiModeBoolString)
 
-    val tryCpu = Try(withCpuSparkSession(castDf, cpuConf)
-      .sortBy(_.getInt(INDEX_ID)))
+    //val tryCpu = Try(withCpuSparkSession(castDf, cpuConf)
+      //.sortBy(_.getInt(INDEX_ID)))
+
+    val tryCpu = Try(withCpuSparkSession(castDf, cpuConf))
 
     val gpuConf = new SparkConf()
       .set(SQLConf.ANSI_ENABLED.key, ansiModeBoolString)
@@ -226,11 +237,35 @@ class CastOpSuite extends GpuExpressionTestSuite {
       // Tests that this is not true for are skipped in 3.2.0+
       .set(RapidsConf.HAS_EXTENDED_YEAR_VALUES.key, "false")
 
-    val tryGpu = Try(withGpuSparkSession(castDf, gpuConf)
-      .sortBy(_.getInt(INDEX_ID)))
+    //val tryGpu = Try(withGpuSparkSession(castDf, gpuConf)
+      //.sortBy(_.getInt(INDEX_ID)))
+
+    val tryGpu = Try(withGpuSparkSession(castDf, gpuConf))
 
     (tryCpu, tryGpu) match {
-      case (Success(cpu), Success(gpu)) if ansiMode != AnsiExpectFailure =>
+      // case (Success(cpuDf), Success(gpuDf)) if ansiMode != AnsiExpectFailure =>
+      case (Success(cpuT), Success(gpuT)) if ansiMode != AnsiExpectFailure =>
+        val cpu = cpuT._1;
+        val gpu = gpuT._1;
+
+        if(outname.length() > 0){
+          // input
+          {
+             def write_it(spark: SparkSession): Unit = {
+              import spark.implicits._              
+              val fname = "/home/dbaranec/projects/db_test/parquet/cast_tests/" + outname + "/in.parquet";
+              strings.toDF().coalesce(1).write.parquet(fname);
+            }    
+            withCpuSparkSession(write_it, cpuConf)
+          }
+
+          // output          
+          {
+            val fname = "/home/dbaranec/projects/db_test/parquet/cast_tests/" + outname + "/out.parquet";
+            cpuT._2.coalesce(1).write.parquet(fname);
+          }
+        }
+
         for ((cpuRow, gpuRow) <- cpu.zip(gpu)) {
           assert(cpuRow.getString(INDEX_C0) === gpuRow.getString(INDEX_C0))
           assert(cpuRow.getInt(INDEX_ID) === gpuRow.getInt(INDEX_ID))

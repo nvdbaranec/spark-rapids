@@ -522,6 +522,8 @@ object GpuCast extends Arm {
             case TimestampType =>
               castStringToTimestamp(trimmed, ansiMode)
             case FloatType | DoubleType =>
+              //CastStrings.stringToFloat(trimmed, ansiMode,
+                //GpuColumnVector.getNonNestedRapidsType(toDataType))
               castStringToFloats(trimmed, ansiMode,
                 GpuColumnVector.getNonNestedRapidsType(toDataType))
             case ByteType | ShortType | IntegerType | LongType =>
@@ -531,6 +533,9 @@ object GpuCast extends Arm {
         }
       case (StringType, dt: DecimalType) =>
         castStringToDecimal(input, ansiMode, dt)
+
+      case (_: StringType, dayTime: DataType) if GpuTypeShims.isSupportedDayTimeType(dayTime) =>
+        GpuIntervalUtils.castStringToDayTimeIntervalWithThrow(input, dayTime)
 
       case (ByteType | ShortType | IntegerType | LongType, dt: DecimalType) =>
         castIntegralsToDecimal(input, dt, ansiMode)
@@ -566,9 +571,6 @@ object GpuCast extends Arm {
 
       case (dayTime: DataType, _: StringType) if GpuTypeShims.isSupportedDayTimeType(dayTime) =>
         GpuIntervalUtils.toDayTimeIntervalString(input, dayTime)
-
-      case (_: StringType, dayTime: DataType) if GpuTypeShims.isSupportedDayTimeType(dayTime) =>
-        GpuIntervalUtils.castStringToDayTimeIntervalWithThrow(input, dayTime)
 
       // cast(`day time interval` as integral)
       case (dt: DataType, _: LongType) if GpuTypeShims.isSupportedDayTimeType(dt) =>
